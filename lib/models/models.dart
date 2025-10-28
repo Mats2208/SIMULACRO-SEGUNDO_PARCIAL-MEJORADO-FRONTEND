@@ -280,3 +280,136 @@ class Company {
     );
   }
 }
+
+// Modelos para Favoritos
+class Favorite {
+  final String productId;
+  final Product? product;
+
+  Favorite({
+    required this.productId,
+    this.product,
+  });
+
+  factory Favorite.fromJson(Map<String, dynamic> json) {
+    return Favorite(
+      productId: json['productId'] ?? '',
+      product: json['product'] != null 
+          ? Product.fromJson(json['product']) 
+          : null,
+    );
+  }
+}
+
+// Estadísticas de favoritos por producto
+class ProductFavoriteStats {
+  final String productId;
+  final String productName;
+  final int favoriteCount;
+  final Product? product;
+
+  ProductFavoriteStats({
+    required this.productId,
+    required this.productName,
+    required this.favoriteCount,
+    this.product,
+  });
+
+  factory ProductFavoriteStats.fromJson(Map<String, dynamic> json) {
+    return ProductFavoriteStats(
+      productId: json['productId']?.toString() ?? '',
+      productName: json['productName']?.toString() ?? json['name']?.toString() ?? '',
+      favoriteCount: _parseIntValue(json['favoriteCount'] ?? json['count']),
+      product: json['product'] != null 
+          ? Product.fromJson(json['product']) 
+          : null,
+    );
+  }
+
+  static int _parseIntValue(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+}
+
+// Top productos más favoritos
+class TopFavoriteProduct {
+  final String productId;
+  final String productName;
+  final int favoriteCount;
+  final Product? product;
+
+  TopFavoriteProduct({
+    required this.productId,
+    required this.productName,
+    required this.favoriteCount,
+    this.product,
+  });
+
+  factory TopFavoriteProduct.fromJson(Map<String, dynamic> json) {
+    return TopFavoriteProduct(
+      productId: json['productId']?.toString() ?? '',
+      productName: json['productName']?.toString() ?? json['name']?.toString() ?? '',
+      favoriteCount: _parseIntValue(json['favoriteCount'] ?? json['count']),
+      product: json['product'] != null 
+          ? Product.fromJson(json['product']) 
+          : null,
+    );
+  }
+
+  static int _parseIntValue(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+}
+
+// Estadísticas de favoritos de empresa
+class CompanyFavoriteStats {
+  final String companyUserId;
+  final String companyName;
+  final int totalFavorites;
+  final List<ProductFavoriteStats> products;
+
+  CompanyFavoriteStats({
+    required this.companyUserId,
+    required this.companyName,
+    required this.totalFavorites,
+    required this.products,
+  });
+
+  factory CompanyFavoriteStats.fromJson(Map<String, dynamic> json) {
+    return CompanyFavoriteStats(
+      companyUserId: json['companyUserId']?.toString() ?? json['userId']?.toString() ?? '',
+      companyName: json['companyName']?.toString() ?? json['name']?.toString() ?? '',
+      totalFavorites: _parseIntValue(json['totalFavorites'] ?? json['total']),
+      products: _parseProductsList(json['products']),
+    );
+  }
+
+  static int _parseIntValue(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  static List<ProductFavoriteStats> _parseProductsList(dynamic value) {
+    if (value == null) return [];
+    if (value is! List) return [];
+    return value
+        .map((item) {
+          try {
+            return ProductFavoriteStats.fromJson(item as Map<String, dynamic>);
+          } catch (e) {
+            print('Error parsing product stats: $e');
+            return null;
+          }
+        })
+        .whereType<ProductFavoriteStats>()
+        .toList();
+  }
+}

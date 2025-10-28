@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/models.dart';
@@ -35,14 +36,23 @@ class ApiService {
   Future<dynamic> _handleResponse(http.Response response) async {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return null;
-      return jsonDecode(response.body);
+      try {
+        return jsonDecode(response.body);
+      } catch (e) {
+        throw ApiException('Error al parsear respuesta JSON: $e');
+      }
     } else {
-      String errorMessage = 'Error en la solicitud';
+      String errorMessage = 'Error ${response.statusCode} en la solicitud';
       try {
         final errorData = jsonDecode(response.body);
-        errorMessage = errorData['message'] ?? errorData['title'] ?? errorMessage;
+        errorMessage = errorData['message'] ?? 
+                      errorData['title'] ?? 
+                      errorData['error'] ??
+                      errorMessage;
       } catch (e) {
-        errorMessage = response.body.isNotEmpty ? response.body : errorMessage;
+        errorMessage = response.body.isNotEmpty 
+            ? 'Error ${response.statusCode}: ${response.body}' 
+            : errorMessage;
       }
       throw ApiException(errorMessage, response.statusCode);
     }
@@ -273,5 +283,93 @@ class ApiService {
     final data = await _handleResponse(response);
     
     return (data as List).map((item) => Product.fromJson(item)).toList();
+  }
+
+  // Favorites Stats endpoints
+  Future<ProductFavoriteStats> getProductFavoriteStats(String productId) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.favoritesStatsProduct}/$productId');
+    final headers = await _getHeaders();
+
+    if (kDebugMode) {
+      print('GET: $url');
+    }
+
+    final response = await http.get(url, headers: headers);
+    
+    if (kDebugMode) {
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+    }
+
+    final data = await _handleResponse(response);
+    
+    return ProductFavoriteStats.fromJson(data);
+  }
+
+  Future<List<TopFavoriteProduct>> getTopFavoriteProducts({
+    int take = 10,
+    bool onlyActive = true,
+  }) async {
+    final url = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.favoritesStatsTop}?take=$take&onlyActive=$onlyActive'
+    );
+    final headers = await _getHeaders();
+
+    if (kDebugMode) {
+      print('GET: $url');
+    }
+
+    final response = await http.get(url, headers: headers);
+    
+    if (kDebugMode) {
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+    }
+
+    final data = await _handleResponse(response);
+    
+    return (data as List).map((item) => TopFavoriteProduct.fromJson(item)).toList();
+  }
+
+  Future<CompanyFavoriteStats> getMyCompanyFavoriteStats() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.favoritesStatsMine}');
+    final headers = await _getHeaders();
+
+    if (kDebugMode) {
+      print('GET: $url');
+    }
+
+    final response = await http.get(url, headers: headers);
+    
+    if (kDebugMode) {
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+    }
+
+    final data = await _handleResponse(response);
+    
+    return CompanyFavoriteStats.fromJson(data);
+  }
+
+  Future<CompanyFavoriteStats> getCompanyFavoriteStats(String companyUserId) async {
+    final url = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.favoritesStatsCompany}/$companyUserId'
+    );
+    final headers = await _getHeaders();
+
+    if (kDebugMode) {
+      print('GET: $url');
+    }
+
+    final response = await http.get(url, headers: headers);
+    
+    if (kDebugMode) {
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+    }
+
+    final data = await _handleResponse(response);
+    
+    return CompanyFavoriteStats.fromJson(data);
   }
 }

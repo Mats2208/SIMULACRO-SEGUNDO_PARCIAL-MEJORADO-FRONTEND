@@ -4,10 +4,12 @@ import '../config/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/favorites_provider.dart';
 import '../widgets/product_card.dart';
 import 'cart_screen.dart';
 import 'favorites_screen.dart';
 import 'profile_screen.dart';
+import 'top_products_screen.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -17,7 +19,7 @@ class ClientHomeScreen extends StatefulWidget {
 }
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
-  String _searchQuery = '';
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -25,15 +27,175 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ProductProvider>(context, listen: false).loadProducts();
       Provider.of<CartProvider>(context, listen: false).loadCart();
-      Provider.of<ProductProvider>(context, listen: false).loadFavorites();
+      Provider.of<FavoritesProvider>(context, listen: false).loadFavorites();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final productProvider = Provider.of<ProductProvider>(context);
+    
+    final List<Widget> screens = [
+      const _ProductsTab(),
+      const TopProductsScreen(),
+      const FavoritesScreen(),
+      const ProfileScreen(),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_getTitleForIndex(_selectedIndex)),
+        backgroundColor: AppTheme.secondaryDark,
+        actions: _getActionsForIndex(_selectedIndex, authProvider),
+      ),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: screens,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: AppTheme.cardDark,
+        selectedItemColor: AppTheme.accentGreen,
+        unselectedItemColor: AppTheme.textSecondary,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Inicio',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.trending_up),
+            label: 'Ranking',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Favoritos',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Perfil',
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getTitleForIndex(int index) {
+    switch (index) {
+      case 0:
+        return 'Productos';
+      case 1:
+        return 'Ranking';
+      case 2:
+        return 'Mis Favoritos';
+      case 3:
+        return 'Mi Perfil';
+      default:
+        return 'Ecommerce';
+    }
+  }
+
+  List<Widget> _getActionsForIndex(int index, AuthProvider authProvider) {
+    if (index == 0) {
+      // Acciones para la pantalla de productos
+      return [
+        _CartIconButton(),
+        IconButton(
+          icon: const Icon(Icons.logout),
+          onPressed: () async {
+            await authProvider.logout();
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, '/login');
+            }
+          },
+        ),
+      ];
+    } else if (index == 3) {
+      // Acciones para perfil
+      return [
+        IconButton(
+          icon: const Icon(Icons.logout),
+          onPressed: () async {
+            await authProvider.logout();
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, '/login');
+            }
+          },
+        ),
+      ];
+    }
+    return [];
+  }
+}
+
+class _CartIconButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
+
+    return Stack(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.shopping_cart),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CartScreen(),
+              ),
+            );
+          },
+        ),
+        if (cartProvider.itemCount > 0)
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppTheme.errorColor,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 18,
+                minHeight: 18,
+              ),
+              child: Text(
+                '${cartProvider.itemCount}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ProductsTab extends StatefulWidget {
+  const _ProductsTab();
+
+  @override
+  State<_ProductsTab> createState() => _ProductsTabState();
+}
+
+class _ProductsTabState extends State<_ProductsTab> {
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final productProvider = Provider.of<ProductProvider>(context);
 
     var filteredProducts = productProvider.products;
     if (_searchQuery.isNotEmpty) {
@@ -44,123 +206,24 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           .toList();
     }
 
-    return Scaffold(
-      body: CustomScrollView(
+    return RefreshIndicator(
+      onRefresh: () async {
+        await productProvider.loadProducts();
+      },
+      child: CustomScrollView(
         slivers: [
-          // App Bar with gradient
-          SliverAppBar(
-            expandedHeight: 120,
-            pinned: true,
-            backgroundColor: AppTheme.secondaryDark,
-            flexibleSpace: FlexibleSpaceBar(
-              title: const Text(
-                'Productos',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black45,
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-              ),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: AppTheme.blueGradient,
-                ),
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.person_rounded),
-                tooltip: 'Mi Perfil',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ProfileScreen(),
-                    ),
-                  );
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.favorite_rounded),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const FavoritesScreen(),
-                    ),
-                  );
-                },
-              ),
-              Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.shopping_cart_rounded),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CartScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  if (cartProvider.itemCount > 0)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.errorColor,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 18,
-                          minHeight: 18,
-                        ),
-                        child: Text(
-                          '${cartProvider.itemCount}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout_rounded),
-                onPressed: () async {
-                  await authProvider.logout();
-                  if (mounted) {
-                    Navigator.pushReplacementNamed(context, '/login');
-                  }
-                },
-              ),
-            ],
-          ),
-
           // Search Bar
           SliverToBoxAdapter(
             child: Container(
               padding: const EdgeInsets.all(16),
-              color: AppTheme.secondaryDark,
               child: TextField(
                 onChanged: (value) => setState(() => _searchQuery = value),
                 decoration: InputDecoration(
                   hintText: 'Buscar productos...',
-                  prefixIcon: const Icon(Icons.search_rounded),
+                  prefixIcon: const Icon(Icons.search),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear_rounded),
+                          icon: const Icon(Icons.clear),
                           onPressed: () => setState(() => _searchQuery = ''),
                         )
                       : null,
@@ -182,33 +245,25 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.errorColor.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Icon(
-                                  Icons.error_outline_rounded,
-                                  size: 64,
-                                  color: AppTheme.errorColor,
-                                ),
+                              const Icon(
+                                Icons.error_outline,
+                                size: 64,
+                                color: AppTheme.errorColor,
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 16),
                               Text(
                                 'Error: ${productProvider.error}',
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                  color: AppTheme.textPrimary,
-                                  fontSize: 16,
+                                  color: AppTheme.textSecondary,
                                 ),
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 16),
                               ElevatedButton.icon(
                                 onPressed: () {
                                   productProvider.loadProducts();
                                 },
-                                icon: const Icon(Icons.refresh_rounded),
+                                icon: const Icon(Icons.refresh),
                                 label: const Text('Reintentar'),
                               ),
                             ],
@@ -222,38 +277,29 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(24),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.cardDark,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Icon(
-                                    _searchQuery.isNotEmpty
-                                        ? Icons.search_off_rounded
-                                        : Icons.inventory_outlined,
-                                    size: 64,
-                                    color: AppTheme.textSecondary.withOpacity(0.5),
-                                  ),
+                                Icon(
+                                  _searchQuery.isNotEmpty
+                                      ? Icons.search_off
+                                      : Icons.inventory_2_outlined,
+                                  size: 64,
+                                  color: AppTheme.textSecondary.withOpacity(0.5),
                                 ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 16),
                                 Text(
                                   _searchQuery.isNotEmpty
                                       ? 'No se encontraron productos'
                                       : 'No hay productos disponibles',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.textPrimary,
+                                    color: AppTheme.textSecondary.withOpacity(0.7),
                                   ),
                                 ),
                                 if (_searchQuery.isNotEmpty) ...[
                                   const SizedBox(height: 8),
-                                  const Text(
-                                    'Intenta con otro término de búsqueda',
+                                  Text(
+                                    'Intenta con otro término',
                                     style: TextStyle(
-                                      fontSize: 14,
-                                      color: AppTheme.textSecondary,
+                                      color: AppTheme.textSecondary.withOpacity(0.5),
                                     ),
                                   ),
                                 ],
